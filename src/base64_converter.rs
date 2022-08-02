@@ -22,13 +22,15 @@ impl Base64Encoder {
             if (i as f64) < ((data.len() * 4) as f64 / 3.0).ceil() {
                 result.push(Base64Encoder::convert_to_char(t));
             } else {
-                result.push('=');
+                break;
             }
             i += 1;
         }
 
-        for _ in 0..(result.len() % 4) {
-            result.push('=');
+        if result.len() % 4 != 0 {
+            for _ in 0..(4 - result.len() % 4) {
+                result.push('=');
+            }
         }
 
         return result;
@@ -65,7 +67,7 @@ impl Base64Decoder {
                     match Base64Decoder::convert_chunk(t.to_vec()) {
                         Ok(mut tmp) => {
                             result.append(&mut tmp);
-                        },
+                        }
                         Err(e) => {
                             return Err(e);
                         }
@@ -80,14 +82,14 @@ impl Base64Decoder {
     }
 
     fn convert_chunk(chunk: Vec<u8>) -> Result<Vec<u8>, Error> {
-        if chunk[1] == 64 {
-            return Ok(vec![]);
+        if chunk[1] == 64 || chunk[0] == 64 {
+            return Err(Error::new(ErrorKind::InvalidInput, "Invalid format."));
         } else if chunk[2] == 64 {
-            return Ok(vec![chunk[0] << 2]);
+            return Ok(vec![chunk[0] << 2 | chunk[1] >> 4]);
         } else if chunk[3] == 64 {
             return Ok(vec![
                 chunk[0] << 2 | chunk[1] >> 4,
-                (chunk[1] & 15) << 4 | chunk[2] >> 2
+                (chunk[1] & 15) << 4 | chunk[2] >> 2,
             ]);
         } else {
             return Ok(vec![
