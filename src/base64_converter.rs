@@ -1,4 +1,7 @@
+use std::io::{Error, ErrorKind};
+
 pub struct Base64Encoder;
+pub struct Base64Decoder;
 
 impl Base64Encoder {
     pub fn encode(data: Vec<u8>) -> String {
@@ -49,6 +52,86 @@ impl Base64Encoder {
             return (d - 4) as char;
         } else {
             return (43 as u8 + (if d & 1 == 0 { 0 } else { 4 })) as char;
+        }
+    }
+}
+
+impl Base64Decoder {
+    pub fn decode(string: String) -> Result<Vec<u8>, Error> {
+        match Base64Decoder::convert_all(string) {
+            Ok(iter) => {
+                let mut result: Vec<u8> = Vec::new();
+                for t in iter.chunks(4) {
+                    match Base64Decoder::convert_chunk(t.to_vec()) {
+                        Ok(mut tmp) => {
+                            result.append(&mut tmp);
+                        },
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    }
+                }
+                return Ok(result);
+            }
+            Err(error) => {
+                return Err(error);
+            }
+        }
+    }
+
+    fn convert_chunk(chunk: Vec<u8>) -> Result<Vec<u8>, Error> {
+        if chunk[1] == 64 {
+            return Ok(vec![]);
+        } else if chunk[2] == 64 {
+            return Ok(vec![chunk[0] << 2]);
+        } else if chunk[3] == 64 {
+            return Ok(vec![
+                chunk[0] << 2 | chunk[1] >> 4,
+                (chunk[1] & 15) << 4 | chunk[2] >> 2
+            ]);
+        } else {
+            return Ok(vec![
+                chunk[0] << 2 | chunk[1] >> 4,
+                (chunk[1] & 15) << 4 | chunk[2] >> 2,
+                (chunk[2] & 3) << 6 | chunk[3],
+            ]);
+        }
+    }
+
+    fn convert_all(s: String) -> Result<Vec<u8>, Error> {
+        let mut result: Vec<u8> = Vec::new();
+        for c in s.as_bytes() {
+            match Base64Decoder::convert_to_bin(*c) {
+                Ok(p) => {
+                    result.push(p);
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+
+        return Ok(result);
+    }
+
+    fn convert_to_bin(d: u8) -> Result<u8, Error> {
+        if 65 <= d && d <= 0x5a {
+            return Ok(d - 65);
+        } else if 0x61 <= d && d <= 0x7a {
+            return Ok(d - 71);
+        } else if 48 <= d && d <= 58 {
+            return Ok(d + 4);
+        } else if d == 0x2b {
+            return Ok(62);
+        } else if d == 0x2f {
+            return Ok(63);
+        } else if d == 0x3d {
+            return Ok(64);
+        } else {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("There was invalid number \'{}\'", d),
+            ));
         }
     }
 }
